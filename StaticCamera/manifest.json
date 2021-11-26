@@ -1,0 +1,8 @@
+{
+  "filename": "StaticCamera.dll",
+  "author": "xen",
+  "name": "Static Camera",
+  "uniqueName": "xen.StaticCamera",
+  "version": "0.1.0",
+  "owmlVersion": "2.0.0"
+}
