@@ -36,6 +36,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Patches.cs" />
     <Compile Include="StaticCamera.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

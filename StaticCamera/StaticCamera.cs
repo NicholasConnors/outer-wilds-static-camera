@@ -16,24 +16,31 @@ namespace StaticCamera
         private Camera _camera;
         private GameObject _cameraObject;
 
+        private bool _initNextTick = false;
         private bool _loaded = false;
         private bool _cameraOn = false;
         private OWCamera _previousCamera;
 
+        public static StaticCamera Instance { get; private set; }
+
         private void Start()
         {
-            ModHelper.Console.WriteLine($"My mod {nameof(StaticCamera)} is loaded!", MessageType.Success);
+            ModHelper.Console.WriteLine($"{nameof(StaticCamera)} is loaded!", MessageType.Success);
+
+            Instance = this;
 
             GlobalMessenger<OWCamera>.AddListener("SwitchActiveCamera", new Callback<OWCamera>(OnSwitchActiveCamera));
-
-            ModHelper.Events.Subscribe<Flashlight>(Events.AfterStart);
+            GlobalMessenger<ProbeLauncher>.AddListener("ProbeLauncherEquipped", OnProbeLauncherEquipped);
+            GlobalMessenger<ProbeLauncher>.AddListener("ProbeLauncherUnequipped", OnProbeLauncherUnequipped);
             SceneManager.sceneLoaded += OnSceneLoaded;
-            ModHelper.Events.Event += OnEvent;
         }
 
         private void OnDestroy()
         {
             GlobalMessenger<OWCamera>.RemoveListener("SwitchActiveCamera", new Callback<OWCamera>(OnSwitchActiveCamera));
+            GlobalMessenger<ProbeLauncher>.RemoveListener("ProbeLauncherEquipped", OnProbeLauncherEquipped);
+            GlobalMessenger<ProbeLauncher>.RemoveListener("ProbeLauncherUnequipped", OnProbeLauncherUnequipped);
+            SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -47,24 +54,11 @@ namespace StaticCamera
             try
             {
                 PreInit();
+                _initNextTick = true;
             }
             catch(Exception e)
             {
-                ModHelper.Console.WriteLine($"Failed pre-initialization. {e.Message}. {e.StackTrace}.", MessageType.Fatal);
-            }
-        }
-
-        private void OnEvent(MonoBehaviour behaviour, Events ev)
-        {
-            if (!(behaviour.GetType() == typeof(Flashlight) && ev == Events.AfterStart)) return;
-            try
-            {
-                Init();
-                _loaded = true;
-            }
-            catch (Exception e)
-            {
-                ModHelper.Console.WriteLine($"Failed initialization. {e.Message}. {e.StackTrace}.", MessageType.Fatal);
+                ModHelper.Console.WriteLine($"Failed static camera pre-initialization. {e.Message}. {e.StackTrace}.", MessageType.Fatal);
             }
         }
 
@@ -93,55 +87,13 @@ namespace StaticCamera
 
             _cameraObject.SetActive(true);
             _camera.CopyFrom(Locator.GetPlayerCamera().mainCamera);
-            _camera.cullingMask &= ~(1 << 27) | (1 << 22);
+            _camera.cullingMask = _camera.cullingMask & ~(1 << 27) | (1 << 22);
 
             _cameraObject.name = "StaticCamera";
         }
 
         private void PlaceCameraAtPostion()
         {
-            /*
-            OWRigidbody relativeBody;
-
-            var playerController = Locator.GetPlayerController();
-
-            // What is the player standing on?
-            if (playerController.IsGrounded())
-            {
-                relativeBody = playerController._groundBody;
-                Write($"Player is grounded");
-            }
-            else
-            {
-                // If we were on the ground within the last few seconds go with that
-                if(Time.time - playerController._lastGroundedTime < 2f)
-                {
-                    relativeBody = playerController._lastGroundBody;
-                }
-                else
-                {
-                    // What has the strongest gravity
-                    var gravityVolumes = Locator.GetPlayerController()._forceDetector._activeVolumes.Where((x) => x is GravityVolume).Cast<GravityVolume>().ToArray();
-                    GravityVolume strongestVolume = gravityVolumes[0];
-                    float strongestGravitySqr = strongestVolume.CalculateForceAccelerationOnBody(Locator.GetPlayerBody()).sqrMagnitude;
-                    for (int i = 1; i < gravityVolumes.Length; i++)
-                    {
-                        var gravityVolume = gravityVolumes[i];
-                        float gravitySqr = gravityVolume.CalculateForceAccelerationOnBody(Locator.GetPlayerBody()).sqrMagnitude;
-                        if (gravitySqr > strongestGravitySqr)
-                        {
-                            strongestGravitySqr = gravitySqr;
-                            strongestVolume = gravityVolume;
-                        }
-                    }
-                    relativeBody = strongestVolume._attachedBody;
-                    Write($"The strongest gravity is {Mathf.Sqrt(strongestGravitySqr)}");
-                }
-            }
-            
-            Write($"Putting camera relative to {relativeBody.name}");
-            */
-
             OWRigidbody relativeBody = null;
 
             if (Locator.GetPlayerController().IsGrounded()) relativeBody = Locator.GetPlayerController()._groundBody;
@@ -175,18 +127,37 @@ namespace StaticCamera
                 if(!_cameraOn)
                 {
                     ShowReticule(false);
+                    ShowLauncher(Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe);
                 }
             }
             else if(_cameraOn)
             {
                 _cameraOn = false;
                 ShowReticule(true);
+                ShowLauncher(true);
             }
+        }
+
+        private void OnProbeLauncherEquipped(ProbeLauncher probeLauncher)
+        {
+            ShowLauncher(true);
+        }
+
+        private void OnProbeLauncherUnequipped(ProbeLauncher probeLauncher)
+        {
+            ShowLauncher(!_cameraOn);
         }
 
         private void ShowReticule(bool visible)
         {
+            Write($"{(visible ? "Showing" : "Hiding")} the reticule.");
             GameObject reticule = GameObject.Find("Reticule");
+            if (reticule == null)
+            {
+                WriteWarning("Couldn't find reticule");
+                return;
+            }
+
             if (visible)
             {
                 reticule.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
@@ -198,8 +169,34 @@ namespace StaticCamera
             }
         }
 
+        private void ShowLauncher(bool visible)
+        {
+            Write($"{(visible ? "Showing" : "Hiding")} the probe launcher");
+            GameObject launcher = Locator.GetPlayerBody().GetComponentInChildren<ProbeLauncher>()?.gameObject;
+            if(launcher == null)
+            {
+                WriteWarning("Couldn't find probe launcher");
+                return;
+            }
+            launcher.transform.localScale = visible ? Vector3.one : Vector3.zero;
+        }
+
         private void Update()
         {
+            if(_initNextTick)
+            {
+                _initNextTick = false;
+                try
+                {
+                    Init();
+                }
+                catch(Exception e)
+                {
+                    ModHelper.Console.WriteLine($"Failed static camera initialization. {e.Message}. {e.StackTrace}.", MessageType.Fatal);
+                }
+                _loaded = true;
+            }
+
             if (!_loaded) return;
 
             bool toggleCamera = false;
@@ -214,8 +211,8 @@ namespace StaticCamera
                 {
                     _previousCamera.mainCamera.enabled = true;
                     _camera.enabled = false;
-                    _cameraOn = false;
                     GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", _previousCamera);
+                    _cameraOn = false;
                 }
                 else
                 {
@@ -224,14 +221,24 @@ namespace StaticCamera
             }
         }
 
-        private void Write(string msg)
+        public bool IsCameraOn()
+        {
+            return _cameraOn;
+        }
+
+        public void Write(string msg)
         {
             ModHelper.Console.WriteLine(msg, MessageType.Info);
         }
 
-        private void WriteError(string msg)
+        public void WriteError(string msg)
         {
             ModHelper.Console.WriteLine(msg, MessageType.Error);
+        }
+
+        public void WriteWarning(string msg)
+        {
+            ModHelper.Console.WriteLine(msg, MessageType.Warning);
         }
     }
 }
