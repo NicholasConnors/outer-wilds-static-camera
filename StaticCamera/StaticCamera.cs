@@ -7,6 +7,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace StaticCamera
 {
@@ -90,6 +91,12 @@ namespace StaticCamera
             _camera.cullingMask = _camera.cullingMask & ~(1 << 27) | (1 << 22);
 
             _cameraObject.name = "StaticCamera";
+
+            try
+            {
+                ModHelper.Interaction.GetMod("xen.DayDream").GetValue<List<OWCamera>>("Cameras").Add(OWCamera);
+            }
+            catch (Exception) { }
         }
 
         private void PlaceCameraAtPostion()
