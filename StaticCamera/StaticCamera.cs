@@ -88,10 +88,20 @@ namespace StaticCamera
 
             _cameraObject.SetActive(true);
             _camera.CopyFrom(Locator.GetPlayerCamera().mainCamera);
-            _camera.cullingMask = _camera.cullingMask & ~(1 << 27) | (1 << 22);
 
             _cameraObject.name = "StaticCamera";
 
+            // ThirdPersonMod makes the default camera culling mask work well but otherwise we use probe camera settings
+            IModBehaviour _thirdPersonMod = null;
+            try
+            {
+                _thirdPersonMod = ModHelper.Interaction.GetMod("xen.ThirdPersonCamera");
+            }
+            catch (Exception) { }
+            if (_thirdPersonMod == null)
+                _camera.cullingMask = _camera.cullingMask & ~(1 << 27) | (1 << 22);
+
+            // We add our camera to the list of cameras in daydream so it shows the sky correctly too
             try
             {
                 ModHelper.Interaction.GetMod("xen.DayDream").GetValue<List<OWCamera>>("Cameras").Add(OWCamera);
@@ -122,6 +132,7 @@ namespace StaticCamera
             _cameraObject.transform.rotation = Locator.GetActiveCamera().transform.rotation;
             _previousCamera = Locator.GetActiveCamera();
             _previousCamera.mainCamera.enabled = false;
+
             _camera.enabled = true;
             GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", OWCamera);
             _cameraOn = true;
@@ -207,9 +218,18 @@ namespace StaticCamera
             if (!_loaded) return;
 
             bool toggleCamera = false;
-            if (Keyboard.current != null)
+            if (!OWInput.IsInputMode(InputMode.Menu))
             {
-                toggleCamera |= Keyboard.current[Key.B].wasReleasedThisFrame;
+                if (Keyboard.current != null)
+                {
+                    toggleCamera |= Keyboard.current[Key.B].wasReleasedThisFrame;
+                }
+
+                // Don't check this if we are in the signalscope with multiple frequencies available or if we have the probe launcher equiped but not in the ship (same button as change freq/photo mode)
+                var flag1 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.SignalScope) && PlayerData.KnowsMultipleFrequencies();
+                var flag2 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe && !PlayerState.AtFlightConsole());
+                if (!flag1 && !flag2)
+                    toggleCamera |= OWInput.IsNewlyReleased(InputLibrary.toolOptionRight);
             }
 
             if (toggleCamera)
