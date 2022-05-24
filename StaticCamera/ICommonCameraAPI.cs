@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 
 namespace StaticCamera
 {
-    class Patches
+    public interface ICommonCameraAPI
     {
-
+        void RegisterCustomCamera(OWCamera OWCamera);
+        OWCamera CreateCustomCamera(string name);
     }
 }

@@ -22,6 +22,8 @@ namespace StaticCamera
         private bool _cameraOn = false;
         private OWCamera _previousCamera;
 
+        private ICommonCameraAPI _commonCameraAPI;
+
         public static StaticCamera Instance { get; private set; }
 
         private void Start()
@@ -33,7 +35,20 @@ namespace StaticCamera
             GlobalMessenger<OWCamera>.AddListener("SwitchActiveCamera", new Callback<OWCamera>(OnSwitchActiveCamera));
             GlobalMessenger<ProbeLauncher>.AddListener("ProbeLauncherEquipped", OnProbeLauncherEquipped);
             GlobalMessenger<ProbeLauncher>.AddListener("ProbeLauncherUnequipped", OnProbeLauncherUnequipped);
+            GlobalMessenger<GraphicSettings>.AddListener("GraphicSettingsUpdated", OnGraphicSettingsUpdated);
+
             SceneManager.sceneLoaded += OnSceneLoaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+
+            try
+            {
+                _commonCameraAPI = ModHelper.Interaction.GetModApi<ICommonCameraAPI>("xen.CommonCameraUtility");
+            }
+            catch (Exception e)
+            {
+                WriteError($"CommonCameraAPI was not found. StaticCamera will not run. {e.Message}, {e.StackTrace}");
+                enabled = false;
+            }
         }
 
         private void OnDestroy()
@@ -41,12 +56,15 @@ namespace StaticCamera
             GlobalMessenger<OWCamera>.RemoveListener("SwitchActiveCamera", new Callback<OWCamera>(OnSwitchActiveCamera));
             GlobalMessenger<ProbeLauncher>.RemoveListener("ProbeLauncherEquipped", OnProbeLauncherEquipped);
             GlobalMessenger<ProbeLauncher>.RemoveListener("ProbeLauncherUnequipped", OnProbeLauncherUnequipped);
+            GlobalMessenger<GraphicSettings>.RemoveListener("GraphicSettingsUpdated", OnGraphicSettingsUpdated);
+
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (scene.name != "SolarSystem")
+            if (scene.name != "SolarSystem" && scene.name != "EyeOfTheUniverse")
             {
                 _loaded = false;
                 return;
@@ -57,10 +75,15 @@ namespace StaticCamera
                 PreInit();
                 _initNextTick = true;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                ModHelper.Console.WriteLine($"Failed static camera pre-initialization. {e.Message}. {e.StackTrace}.", MessageType.Fatal);
+                WriteError($"Failed static camera pre-initialization. {e.Message}. {e.StackTrace}.");
             }
+        }
+
+        private void OnSceneUnloaded(Scene _)
+        {
+
         }
 
         private void PreInit()
@@ -77,48 +100,60 @@ namespace StaticCamera
 
         private void Init()
         {
-            FlashbackScreenGrabImageEffect temp = _cameraObject.AddComponent<FlashbackScreenGrabImageEffect>();
-            temp._downsampleShader = Locator.GetPlayerCamera().gameObject.GetComponent<FlashbackScreenGrabImageEffect>()._downsampleShader;
+            _cameraObject.SetActive(false);
 
-            PlanetaryFogImageEffect _image = _cameraObject.AddComponent<PlanetaryFogImageEffect>();
-            _image.fogShader = Locator.GetPlayerCamera().gameObject.GetComponent<PlanetaryFogImageEffect>().fogShader;
+            var downSampleShader = Locator.GetPlayerCamera()?.gameObject?.GetComponent<FlashbackScreenGrabImageEffect>()?._downsampleShader;
+            if (downSampleShader != null)
+            {
+                var temp = _cameraObject.AddComponent<FlashbackScreenGrabImageEffect>();
+                temp._downsampleShader = downSampleShader;
+            }
 
-            PostProcessingBehaviour _postProcessiong = _cameraObject.AddComponent<PostProcessingBehaviour>();
-            _postProcessiong.profile = Locator.GetPlayerCamera().gameObject.GetAddComponent<PostProcessingBehaviour>().profile;
+            var fogShader = Locator.GetPlayerCamera()?.gameObject?.GetComponent<PlanetaryFogImageEffect>()?.fogShader;
+            if (fogShader != null)
+            {
+                var _image = _cameraObject.AddComponent<PlanetaryFogImageEffect>();
+                _image.fogShader = fogShader;
+            }
+
+            var profile = Locator.GetPlayerCamera()?.gameObject?.GetComponent<PostProcessingBehaviour>()?.profile;
+            if (profile != null)
+            {
+                var _postProcessiong = _cameraObject.AddComponent<PostProcessingBehaviour>();
+                _postProcessiong.profile = profile;
+            }
 
             _cameraObject.SetActive(true);
             _camera.CopyFrom(Locator.GetPlayerCamera().mainCamera);
 
             _cameraObject.name = "StaticCamera";
 
-            // ThirdPersonMod makes the default camera culling mask work well but otherwise we use probe camera settings
-            IModBehaviour _thirdPersonMod = null;
-            try
-            {
-                _thirdPersonMod = ModHelper.Interaction.GetMod("xen.ThirdPersonCamera");
-            }
-            catch (Exception) { }
-            if (_thirdPersonMod == null)
-                _camera.cullingMask = _camera.cullingMask & ~(1 << 27) | (1 << 22);
+            _commonCameraAPI.RegisterCustomCamera(OWCamera);
 
-            // We add our camera to the list of cameras in daydream so it shows the sky correctly too
-            try
-            {
-                ModHelper.Interaction.GetMod("xen.DayDream").GetValue<List<OWCamera>>("Cameras").Add(OWCamera);
-            }
-            catch (Exception) { }
+            Locator.GetPlayerBody().gameObject.AddComponent<PromptHandler>();
         }
 
         private void PlaceCameraAtPostion()
         {
             OWRigidbody relativeBody = null;
 
-            if (Locator.GetPlayerController().IsGrounded()) relativeBody = Locator.GetPlayerController()._groundBody;
-            if (relativeBody == null && (Time.time - Locator.GetPlayerController()._lastGroundedTime < 2f)) relativeBody = Locator.GetPlayerController()._lastGroundBody;
-            if(relativeBody == null) relativeBody = Locator.GetReferenceFrame(true)?.GetOWRigidBody();
-            if (relativeBody == null) relativeBody = Locator.GetReferenceFrame(false)?.GetOWRigidBody();
-
-            if(relativeBody == null)
+            if (Locator.GetPlayerController().IsGrounded())
+            {
+                relativeBody = Locator.GetPlayerController()._groundBody;
+            }
+            if (relativeBody == null && (Time.time - Locator.GetPlayerController()._lastGroundedTime < 2f))
+            {
+                relativeBody = Locator.GetPlayerController()._lastGroundBody;
+            }
+            if (relativeBody == null)
+            {
+                relativeBody = Locator.GetReferenceFrame(true)?.GetOWRigidBody();
+            }
+            if (relativeBody == null)
+            {
+                relativeBody = Locator.GetReferenceFrame(false)?.GetOWRigidBody();
+            }
+            if (relativeBody == null)
             {
                 WriteError("Couldn't find something to position the camera relative to.");
                 Locator.GetPlayerAudioController().PlayNegativeUISound();
@@ -142,13 +177,13 @@ namespace StaticCamera
         {
             if (camera.Equals(OWCamera))
             {
-                if(!_cameraOn)
+                if (!_cameraOn)
                 {
                     ShowReticule(false);
                     ShowLauncher(Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe);
                 }
             }
-            else if(_cameraOn)
+            else if (_cameraOn)
             {
                 _cameraOn = false;
                 ShowReticule(true);
@@ -191,7 +226,7 @@ namespace StaticCamera
         {
             Write($"{(visible ? "Showing" : "Hiding")} the probe launcher");
             GameObject launcher = Locator.GetPlayerBody().GetComponentInChildren<ProbeLauncher>()?.gameObject;
-            if(launcher == null)
+            if (launcher == null)
             {
                 WriteWarning("Couldn't find probe launcher");
                 return;
@@ -201,14 +236,14 @@ namespace StaticCamera
 
         private void Update()
         {
-            if(_initNextTick)
+            if (_initNextTick)
             {
                 _initNextTick = false;
                 try
                 {
                     Init();
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     ModHelper.Console.WriteLine($"Failed static camera initialization. {e.Message}. {e.StackTrace}.", MessageType.Fatal);
                 }
@@ -225,16 +260,15 @@ namespace StaticCamera
                     toggleCamera |= Keyboard.current[Key.B].wasReleasedThisFrame;
                 }
 
-                // Don't check this if we are in the signalscope with multiple frequencies available or if we have the probe launcher equiped but not in the ship (same button as change freq/photo mode)
-                var flag1 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.SignalScope) && PlayerData.KnowsMultipleFrequencies();
-                var flag2 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe && !PlayerState.AtFlightConsole());
-                if (!flag1 && !flag2)
+                if (CanUse())
+                {
                     toggleCamera |= OWInput.IsNewlyReleased(InputLibrary.toolOptionRight);
+                }
             }
 
             if (toggleCamera)
             {
-                if(_cameraOn)
+                if (_cameraOn)
                 {
                     _previousCamera.mainCamera.enabled = true;
                     _camera.enabled = false;
@@ -244,8 +278,33 @@ namespace StaticCamera
                 else
                 {
                     PlaceCameraAtPostion();
+
+                    // Update the FOV to make sure it matches the player camera
+                    _camera.fieldOfView = Locator.GetPlayerCamera().fieldOfView;
                 }
             }
+        }
+
+        public bool CanUse()
+        {
+            // Always let us turn this off
+            if (_cameraOn) return true;
+
+            var flag1 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.SignalScope);
+            var flag2 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe);
+
+            return !flag1 && !flag2;
+        }
+
+        private void OnGraphicSettingsUpdated(GraphicSettings graphicsSettings)
+        {
+            if (!_loaded) return;
+
+            if (OWMath.ApproxEquals(graphicsSettings.fieldOfView, _camera.fieldOfView, 0.001f))
+            {
+                return;
+            }
+            _camera.fieldOfView = graphicsSettings.fieldOfView;
         }
 
         public bool IsCameraOn()
