@@ -64,11 +64,7 @@ namespace StaticCamera
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (scene.name != "SolarSystem" && scene.name != "EyeOfTheUniverse")
-            {
-                _loaded = false;
-                return;
-            }
+            if (scene.name != "SolarSystem" && scene.name != "EyeOfTheUniverse") return;
 
             try
             {
@@ -83,53 +79,17 @@ namespace StaticCamera
 
         private void OnSceneUnloaded(Scene _)
         {
-
+            _loaded = false;
         }
 
         private void PreInit()
         {
-            _cameraObject = new GameObject();
-            _cameraObject.SetActive(false);
-
-            _camera = _cameraObject.AddComponent<Camera>();
-            _camera.enabled = false;
-
-            OWCamera = _cameraObject.AddComponent<OWCamera>();
-            OWCamera.renderSkybox = true;
+            (OWCamera, _camera) = _commonCameraAPI.CreateCustomCamera("StaticCamera");
+            _cameraObject = _camera.gameObject;
         }
 
         private void Init()
         {
-            _cameraObject.SetActive(false);
-
-            var downSampleShader = Locator.GetPlayerCamera()?.gameObject?.GetComponent<FlashbackScreenGrabImageEffect>()?._downsampleShader;
-            if (downSampleShader != null)
-            {
-                var temp = _cameraObject.AddComponent<FlashbackScreenGrabImageEffect>();
-                temp._downsampleShader = downSampleShader;
-            }
-
-            var fogShader = Locator.GetPlayerCamera()?.gameObject?.GetComponent<PlanetaryFogImageEffect>()?.fogShader;
-            if (fogShader != null)
-            {
-                var _image = _cameraObject.AddComponent<PlanetaryFogImageEffect>();
-                _image.fogShader = fogShader;
-            }
-
-            var profile = Locator.GetPlayerCamera()?.gameObject?.GetComponent<PostProcessingBehaviour>()?.profile;
-            if (profile != null)
-            {
-                var _postProcessiong = _cameraObject.AddComponent<PostProcessingBehaviour>();
-                _postProcessiong.profile = profile;
-            }
-
-            _cameraObject.SetActive(true);
-            _camera.CopyFrom(Locator.GetPlayerCamera().mainCamera);
-
-            _cameraObject.name = "StaticCamera";
-
-            _commonCameraAPI.RegisterCustomCamera(OWCamera);
-
             Locator.GetPlayerBody().gameObject.AddComponent<PromptHandler>();
         }
 
