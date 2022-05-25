@@ -1,13 +1,9 @@
-﻿using OWML.ModHelper;
-using OWML.Common;
-using OWML.Utils;
-using UnityEngine;
-using UnityEngine.PostProcessing;
-using UnityEngine.SceneManagement;
-using UnityEngine.InputSystem;
+﻿using OWML.Common;
+using OWML.ModHelper;
 using System;
-using System.Linq;
-using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace StaticCamera
 {

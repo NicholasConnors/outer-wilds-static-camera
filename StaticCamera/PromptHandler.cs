@@ -1,16 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace StaticCamera
 {
     public class PromptHandler : MonoBehaviour
     {
-        private ScreenPrompt _gamepadCameraPrompt = new ScreenPrompt(InputLibrary.toolOptionRight, "Toggle Static Camera <CMD>");
-        private ScreenPrompt _keyboardCameraPrompt = new ScreenPrompt("Toggle Static Camera [B]");
+        private static ScreenPrompt _gamepadCameraPrompt;
+        private static ScreenPrompt _keyboardCameraPrompt;
+        private static Texture2D _bKey;
+        private static bool _initialized;
 
         private bool _usingGamepad;
         private bool _canUse;
@@ -18,6 +15,17 @@ namespace StaticCamera
 
         private void Awake()
         {
+            if (!_initialized)
+            {
+                _bKey = StaticCamera.Instance.ModHelper.Assets.GetTexture("assets/B_Key_Dark.png");
+
+                var bSprite = Sprite.Create(_bKey, new Rect(0, 0, _bKey.width, _bKey.height), new Vector2(_bKey.width, _bKey.height) / 2f);
+                _gamepadCameraPrompt = new ScreenPrompt(InputLibrary.toolOptionRight, "Toggle Static Camera <CMD>");
+                _keyboardCameraPrompt = new ScreenPrompt("Toggle Static Camera <CMD>", bSprite);
+
+                _initialized = true;
+            }
+
             Locator.GetPromptManager().AddScreenPrompt(_gamepadCameraPrompt, PromptPosition.UpperRight, false);
             Locator.GetPromptManager().AddScreenPrompt(_keyboardCameraPrompt, PromptPosition.UpperRight, false);
 
@@ -50,6 +58,7 @@ namespace StaticCamera
                 _usingGamepad = !_usingGamepad;
                 UpdatePromptVisibility();
             }
+
             if (_canUse != StaticCamera.Instance.CanUse())
             {
                 _canUse = !_canUse;
@@ -77,9 +86,10 @@ namespace StaticCamera
 
         private void UpdatePromptVisibility()
         {
-            if(_enabled && _canUse)
+            if (_enabled)
             {
-                _gamepadCameraPrompt.SetVisibility(_usingGamepad);
+                // CanUse is only for game pad
+                _gamepadCameraPrompt.SetVisibility(_usingGamepad && _canUse);
                 _keyboardCameraPrompt.SetVisibility(!_usingGamepad);
             }
             else
