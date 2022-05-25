@@ -16,7 +16,6 @@ namespace StaticCamera
         private bool _initNextTick = false;
         private bool _loaded = false;
         private bool _cameraOn = false;
-        private OWCamera _previousCamera;
 
         private ICommonCameraAPI _commonCameraAPI;
 
@@ -122,8 +121,8 @@ namespace StaticCamera
             _cameraObject.transform.position = Locator.GetActiveCamera().transform.position;
             _cameraObject.transform.rotation = Locator.GetActiveCamera().transform.rotation;
 
-            _previousCamera = Locator.GetActiveCamera();
-            _previousCamera.mainCamera.enabled = false;
+            var previousCamera = Locator.GetActiveCamera();
+            previousCamera.mainCamera.enabled = false;
             _camera.enabled = true;
             GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", OWCamera);
             _cameraOn = true;
@@ -182,9 +181,9 @@ namespace StaticCamera
                 if (_cameraOn)
                 {
                     _camera.enabled = false;
-                    _previousCamera.mainCamera.enabled = true;
+                    Locator.GetPlayerCamera().mainCamera.enabled = true;
 
-                    GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", _previousCamera);
+                    GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", Locator.GetPlayerCamera());
                     _cameraOn = false;
                 }
                 else
