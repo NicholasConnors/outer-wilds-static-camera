@@ -4,6 +4,6 @@
   "name": "Static Camera",
   "uniqueName": "xen.StaticCamera",
   "version": "1.0.0",
-  "owmlVersion": "2.2.0",
+  "owmlVersion": "2.3.2",
   "dependencies": [ "xen.CommonCameraUtility" ]
 }

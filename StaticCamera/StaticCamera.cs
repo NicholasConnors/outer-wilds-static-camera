@@ -24,6 +24,8 @@ namespace StaticCamera
 
         private ICommonCameraAPI _commonCameraAPI;
 
+        private GUIMode.RenderMode _lastRenderMode;
+
         public static StaticCamera Instance { get; private set; }
 
         private void Start()
@@ -32,9 +34,7 @@ namespace StaticCamera
 
             Instance = this;
 
-            GlobalMessenger<OWCamera>.AddListener("SwitchActiveCamera", new Callback<OWCamera>(OnSwitchActiveCamera));
-            GlobalMessenger<ProbeLauncher>.AddListener("ProbeLauncherEquipped", OnProbeLauncherEquipped);
-            GlobalMessenger<ProbeLauncher>.AddListener("ProbeLauncherUnequipped", OnProbeLauncherUnequipped);
+            GlobalMessenger<OWCamera>.AddListener("SwitchActiveCamera", OnSwitchActiveCamera);
             GlobalMessenger<GraphicSettings>.AddListener("GraphicSettingsUpdated", OnGraphicSettingsUpdated);
 
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -53,9 +53,7 @@ namespace StaticCamera
 
         private void OnDestroy()
         {
-            GlobalMessenger<OWCamera>.RemoveListener("SwitchActiveCamera", new Callback<OWCamera>(OnSwitchActiveCamera));
-            GlobalMessenger<ProbeLauncher>.RemoveListener("ProbeLauncherEquipped", OnProbeLauncherEquipped);
-            GlobalMessenger<ProbeLauncher>.RemoveListener("ProbeLauncherUnequipped", OnProbeLauncherUnequipped);
+            GlobalMessenger<OWCamera>.RemoveListener("SwitchActiveCamera", OnSwitchActiveCamera);
             GlobalMessenger<GraphicSettings>.RemoveListener("GraphicSettingsUpdated", OnGraphicSettingsUpdated);
 
             SceneManager.sceneLoaded -= OnSceneLoaded;
@@ -65,6 +63,8 @@ namespace StaticCamera
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             if (scene.name != "SolarSystem" && scene.name != "EyeOfTheUniverse") return;
+
+            _lastRenderMode = GUIMode.RenderMode.Hidden;
 
             try
             {
@@ -93,7 +93,7 @@ namespace StaticCamera
             Locator.GetPlayerBody().gameObject.AddComponent<PromptHandler>();
         }
 
-        private void PlaceCameraAtPostion()
+        private void PlaceCameraAtPosition()
         {
             OWRigidbody relativeBody = null;
 
@@ -125,9 +125,9 @@ namespace StaticCamera
             _cameraObject.transform.parent = relativeBody.transform;
             _cameraObject.transform.position = Locator.GetActiveCamera().transform.position;
             _cameraObject.transform.rotation = Locator.GetActiveCamera().transform.rotation;
+
             _previousCamera = Locator.GetActiveCamera();
             _previousCamera.mainCamera.enabled = false;
-
             _camera.enabled = true;
             GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", OWCamera);
             _cameraOn = true;
@@ -135,63 +135,18 @@ namespace StaticCamera
 
         private void OnSwitchActiveCamera(OWCamera camera)
         {
-            if (camera.Equals(OWCamera))
+            if (camera.Equals(OWCamera) && !_cameraOn)
             {
-                if (!_cameraOn)
-                {
-                    ShowReticule(false);
-                    ShowLauncher(Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe);
-                }
+                _cameraOn = true;
+
+                GUIMode.SetRenderMode(GUIMode.RenderMode.Hidden);
             }
-            else if (_cameraOn)
+            else if (!camera.Equals(OWCamera) && _cameraOn)
             {
                 _cameraOn = false;
-                ShowReticule(true);
-                ShowLauncher(true);
-            }
-        }
 
-        private void OnProbeLauncherEquipped(ProbeLauncher probeLauncher)
-        {
-            ShowLauncher(true);
-        }
-
-        private void OnProbeLauncherUnequipped(ProbeLauncher probeLauncher)
-        {
-            ShowLauncher(!_cameraOn);
-        }
-
-        private void ShowReticule(bool visible)
-        {
-            Write($"{(visible ? "Showing" : "Hiding")} the reticule.");
-            GameObject reticule = GameObject.Find("Reticule");
-            if (reticule == null)
-            {
-                WriteWarning("Couldn't find reticule");
-                return;
+                GUIMode.SetRenderMode(GUIMode.RenderMode.FPS);
             }
-
-            if (visible)
-            {
-                reticule.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-            }
-            else
-            {
-                reticule.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceCamera;
-                reticule.GetComponent<Canvas>().worldCamera = Locator.GetPlayerCamera().mainCamera;
-            }
-        }
-
-        private void ShowLauncher(bool visible)
-        {
-            Write($"{(visible ? "Showing" : "Hiding")} the probe launcher");
-            GameObject launcher = Locator.GetPlayerBody().GetComponentInChildren<ProbeLauncher>()?.gameObject;
-            if (launcher == null)
-            {
-                WriteWarning("Couldn't find probe launcher");
-                return;
-            }
-            launcher.transform.localScale = visible ? Vector3.one : Vector3.zero;
         }
 
         private void Update()
@@ -230,14 +185,15 @@ namespace StaticCamera
             {
                 if (_cameraOn)
                 {
-                    _previousCamera.mainCamera.enabled = true;
                     _camera.enabled = false;
+                    _previousCamera.mainCamera.enabled = true;
+
                     GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", _previousCamera);
                     _cameraOn = false;
                 }
                 else
                 {
-                    PlaceCameraAtPostion();
+                    PlaceCameraAtPosition();
 
                     // Update the FOV to make sure it matches the player camera
                     _camera.fieldOfView = Locator.GetPlayerCamera().fieldOfView;
