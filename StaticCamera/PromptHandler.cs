@@ -9,8 +9,6 @@ namespace StaticCamera
         private static Texture2D _bKey;
         private static bool _initialized;
 
-        private bool _usingGamepad;
-        private bool _canUse;
         private bool _enabled;
 
         private void Awake()
@@ -35,9 +33,6 @@ namespace StaticCamera
 
             var toolMode = Locator.GetToolModeSwapper().GetToolMode();
 
-            _canUse = StaticCamera.Instance.CanUse();
-            _usingGamepad = OWInput.UsingGamepad();
-
             UpdatePromptVisibility();
         }
 
@@ -53,44 +48,30 @@ namespace StaticCamera
 
         private void Update()
         {
-            if (OWInput.UsingGamepad() != _usingGamepad)
-            {
-                _usingGamepad = !_usingGamepad;
-                UpdatePromptVisibility();
-            }
-
-            if (_canUse != StaticCamera.Instance.CanUse())
-            {
-                _canUse = !_canUse;
-                UpdatePromptVisibility();
-            }
+            UpdatePromptVisibility();
         }
 
         private void OnGamePaused()
         {
             _enabled = false;
-            UpdatePromptVisibility();
         }
 
         private void OnGameUnpaused()
         {
             _enabled = true;
-            UpdatePromptVisibility();
         }
 
         private void OnWakeUp()
         {
             _enabled = true;
-            UpdatePromptVisibility();
         }
 
         private void UpdatePromptVisibility()
         {
-            if (_enabled)
+            if (_enabled && StaticCamera.Instance.CanUse())
             {
-                // CanUse is only for game pad
-                _gamepadCameraPrompt.SetVisibility(_usingGamepad && _canUse);
-                _keyboardCameraPrompt.SetVisibility(!_usingGamepad);
+                _gamepadCameraPrompt.SetVisibility(OWInput.UsingGamepad());
+                _keyboardCameraPrompt.SetVisibility(!OWInput.UsingGamepad());
             }
             else
             {

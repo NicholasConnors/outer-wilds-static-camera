@@ -163,14 +163,15 @@ namespace StaticCamera
             if (!_loaded) return;
 
             bool toggleCamera = false;
-            if (!OWInput.IsInputMode(InputMode.Menu))
+            if (CanUse())
             {
                 if (Keyboard.current != null)
                 {
                     toggleCamera |= Keyboard.current[Key.B].wasReleasedThisFrame;
                 }
 
-                if (CanUse())
+                // Only accept this when using gamepad
+                if (OWInput.UsingGamepad())
                 {
                     toggleCamera |= OWInput.IsNewlyReleased(InputLibrary.toolOptionRight);
                 }
@@ -201,10 +202,18 @@ namespace StaticCamera
             // Always let us turn this off
             if (_cameraOn) return true;
 
-            var flag1 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.SignalScope);
-            var flag2 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe);
+            // Only allow use in certain input modes
+            if (!OWInput.IsInputMode(InputMode.Character | InputMode.Dialogue | InputMode.ShipCockpit | InputMode.ModelShip | InputMode.LandingCam)) return false;
 
-            return !flag1 && !flag2;
+            // When using gamepad we're more restrictive
+            if (OWInput.UsingGamepad())
+            {
+                var flag1 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.SignalScope);
+                var flag2 = (Locator.GetToolModeSwapper().GetToolMode() == ToolMode.Probe);
+                return !flag1 && !flag2;
+            }
+
+            return true;
         }
 
         private void OnGraphicSettingsUpdated(GraphicSettings graphicsSettings)
