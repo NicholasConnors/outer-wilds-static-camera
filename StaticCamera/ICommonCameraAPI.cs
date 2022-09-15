@@ -1,10 +1,9 @@
 ﻿using UnityEngine;
 
-namespace StaticCamera
+namespace StaticCamera;
+
+public interface ICommonCameraAPI
 {
-    public interface ICommonCameraAPI
-    {
-        void RegisterCustomCamera(OWCamera OWCamera);
-        (OWCamera, Camera) CreateCustomCamera(string name);
-    }
+	void RegisterCustomCamera(OWCamera OWCamera);
+	(OWCamera, Camera) CreateCustomCamera(string name);
 }
