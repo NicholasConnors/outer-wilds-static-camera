@@ -1,9 +1,10 @@
 {
+  "$schema": "https://raw.githubusercontent.com/amazingalek/owml/master/schemas/manifest_schema.json",
   "filename": "StaticCamera.dll",
   "author": "xen",
   "name": "Static Camera",
   "uniqueName": "xen.StaticCamera",
-  "version": "1.0.2",
-  "owmlVersion": "2.3.2",
+  "version": "1.0.3",
+  "owmlVersion": "2.6.0",
   "dependencies": [ "xen.CommonCameraUtility" ]
 }
