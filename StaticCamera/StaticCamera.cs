@@ -82,7 +82,13 @@ public class StaticCamera : ModBehaviour
 
 	private void PreInit()
 	{
-		(OWCamera, _camera) = _commonCameraAPI.CreateCustomCamera("StaticCamera");
+		(OWCamera, _camera) = _commonCameraAPI.CreateCustomCamera("StaticCamera", (OWCamera cam) =>
+		{
+			cam.mainCamera.cullingMask &= ~(1 << LayerMask.NameToLayer("UI"));
+			cam.mainCamera.cullingMask &= ~(1 << LayerMask.NameToLayer("HeadsUpDisplay"));
+			cam.mainCamera.cullingMask &= ~(1 << LayerMask.NameToLayer("HelmetUVPass"));
+		});
+
 		_cameraObject = _camera.gameObject;
 	}
 
@@ -124,11 +130,7 @@ public class StaticCamera : ModBehaviour
 		_cameraObject.transform.position = Locator.GetActiveCamera().transform.position;
 		_cameraObject.transform.rotation = Locator.GetActiveCamera().transform.rotation;
 
-		var previousCamera = Locator.GetActiveCamera();
-		previousCamera.mainCamera.enabled = false;
-		_camera.enabled = true;
-		GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", OWCamera);
-		_cameraOn = true;
+		_commonCameraAPI.EnterCamera(OWCamera);
 	}
 
 	private void OnSwitchActiveCamera(OWCamera camera)
@@ -184,10 +186,7 @@ public class StaticCamera : ModBehaviour
 		{
 			if (_cameraOn)
 			{
-				_camera.enabled = false;
-				Locator.GetPlayerCamera().mainCamera.enabled = true;
-
-				GlobalMessenger<OWCamera>.FireEvent("SwitchActiveCamera", Locator.GetPlayerCamera());
+				_commonCameraAPI.ExitCamera(OWCamera);
 				_cameraOn = false;
 			}
 			else
