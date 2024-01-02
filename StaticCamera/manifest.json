@@ -4,7 +4,8 @@
   "author": "xen",
   "name": "Static Camera",
   "uniqueName": "xen.StaticCamera",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "owmlVersion": "2.6.0",
-  "dependencies": [ "xen.CommonCameraUtility" ]
+  "dependencies": [ "xen.CommonCameraUtility" ],
+  "donateLink": "https://www.patreon.com/xen42"
 }
