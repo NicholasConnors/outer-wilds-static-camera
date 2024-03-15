@@ -7,9 +7,9 @@ public class PromptHandler : MonoBehaviour
 	private static ScreenPrompt _gamepadCameraPrompt;
 	private static ScreenPrompt _keyboardCameraPrompt;
 	private static Texture2D _bKey;
-	private static bool _initialized;
+    private static bool _initialized;
 
-	private bool _enabled;
+    private bool _enabled;
 
 	private void Awake()
 	{
@@ -68,7 +68,7 @@ public class PromptHandler : MonoBehaviour
 
 	private void UpdatePromptVisibility()
 	{
-		if (_enabled && StaticCamera.Instance.CanUse())
+		if (_enabled && StaticCamera.Instance.CanUse() && PlayerData.GetPromptsEnabled())
 		{
 			_gamepadCameraPrompt.SetVisibility(OWInput.UsingGamepad());
 			_keyboardCameraPrompt.SetVisibility(!OWInput.UsingGamepad());
